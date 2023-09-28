@@ -8,6 +8,8 @@ get_bia_photos(
   query_bounds,
   BIA_PATH,
   dest_dir,
+  dest_separate = TRUE,
+  impact_values = 1:3,
   feature_layer = "BIAver2",
   feature_key = "globalid",
   attachment_layer = "BIAver2__ATTACH",
@@ -15,8 +17,26 @@ get_bia_photos(
 )
 }
 \arguments{
+\item{query_bounds}{An \code{sf} spatial data frame containing one or more
+polygon features that define the bounds to be queried.}
+
 \item{dest_dir}{(character) Directory in which to write the JPG files for
 photos. If the provided directory path does not exist it will be created.}
+
+\item{dest_separate}{(logical) If \code{TRUE} (default) and the query bounds
+consist of more than one feature, the photos for each polygon will be
+written to a separate sub-directory of \code{dest_dir}. Sub-directory names
+will be \code{'001', '002'} etc. corresponding to the index of the query
+feature. If \code{FALSE}, all photos will be written directly in
+\code{dest_dir}. Note that photos for a MULTIPOLYGON feature will be
+written to a single sub-directory, even if that feature is made up of
+spatially discrete parts.}
+
+\item{impact_values}{(integer) An optional vector of one or more values. If
+provided, BIA records will be filtered to those whose
+\code{ImpactAssessment} value is in this set. Default is to filter on
+values 1, 2 and 3. Set to \code{NULL} or an empty vector for no filtering
+of records.}
 
 \item{feature_layer}{(character) Name of the point feature layer in the
 GeoDatabase for BIA locations. Default value is \code{'BIAver2'}.}
@@ -30,16 +50,13 @@ attachments. Default value is \code{'BIAver2__ATTACH'}.}
 \item{attachment_key}{(character) Name of the attachment layer key field
 linking records to features. Default value is \code{'rel_globalid'}.}
 
-\item{bounds}{An \code{sf} spatial data frame containing one or more polygon
-features that define the bounds to be queried.}
-
 \item{BIA_path}{(character) Path to the ESRI geodatabase of BIA features and
 associated attachments.}
 }
 \value{
 An sf spatial data frame of the BIA point features within the query
-  bounds with all fields from the BIA table plus the column
-  \code{'num_photos'} with number of photos associated with each feature.
+  bounds with all fields from the BIA table plus the columns
+  \code{'photo_dir'} and \code{'num_photos'}.
 }
 \description{
 Extract attached photos for selected BIA features
@@ -49,8 +66,12 @@ Extract attached photos for selected BIA features
 # Read in polygon(s) defining the query bounds
 dat_bounds <- sf::st_read("conjola_boundary.shp")
 
-# Get the photos for BIA features within this query area.
+# Get photos for all BIA features within this query area.
 dat_query_features <- get_bia_photos(dat_bounds, BIA_PATH = "data/BIA_SQL2008.gdb", dest_dir = "conjola")
+
+# Only get the photos for BIA features where impact assessment values are 1-3
+dat_query_features <- get_bia_photos(dat_bounds, BIA_PATH = "data/BIA_SQL2008.gdb", dest_dir = "conjola",
+                                     impact_values = 1:3)
 }
 
 }
