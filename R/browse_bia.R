@@ -49,7 +49,7 @@ browse_bia <- function(BIA_PATH,
   }
 
   library(shiny)
-  library(shinyjs)
+  library(shinyjs, warn.conflicts = FALSE)
   library(leaflet)
 
 
