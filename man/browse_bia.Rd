@@ -45,3 +45,9 @@ This function launches a Shiny app with a map of BIA feature locations.
 Clicking on a feature will query attachments table in the BIA database to
 retrieve associated photographs and display them.
 }
+\examples{
+\dontrun{
+browse_bia(BIA_PATH = "data/BIA_SQL2008.gdb", impact_values = 1:3)
+}
+
+}

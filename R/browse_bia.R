@@ -29,6 +29,11 @@
 #'   other internal information for debugging purposes. Default is \code{FALSE}
 #'   for no debug information.
 #'
+#' @examples
+#' \dontrun{
+#' browse_bia(BIA_PATH = "data/BIA_SQL2008.gdb", impact_values = 1:3)
+#' }
+#'
 #' @export
 #'
 browse_bia <- function(BIA_PATH,
