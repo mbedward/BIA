@@ -88,13 +88,15 @@ browse_bia <- function(BIA_PATH,
     )
   )
 
+
+  # Paths to JPG files for photos associated with a currently
+  # selected BIA feature
+  photo_paths <- reactiveVal(character(0))
+
+
   server <- function(input, output, session) {
     # Function to set marker colours based on ImpactAssessment value
     impact_colour <- leaflet::colorFactor(topo.colors(12), 1:12)
-
-    # Paths to JPG files for photos associated with a currently
-    # selected BIA feature
-    photo_paths <- reactiveVal(character(0))
 
     output$info <- renderText({
       n <- length(photo_paths())
@@ -154,6 +156,11 @@ browse_bia <- function(BIA_PATH,
 
     observe({
       ev <- input$map_marker_click
+
+      if (length(photo_paths()) > 0) {
+        invisible(file.remove(photo_paths()))
+      }
+
       req(!(is.null(ev) || is.null(ev$id)))
 
       cmd <- glue::glue("select {attachment_key} as fkey, GLOBALID as photokey, DATA from {attachment_layer}
@@ -187,6 +194,12 @@ browse_bia <- function(BIA_PATH,
       }
     })
 
+    onStop(
+      function() {
+        print("Removing cached photos")
+        invisible( file.remove(dir(tempdir(), pattern = "\\.jpg$", full.names = TRUE)) )
+      }
+    )
   }
 
   shinyApp(ui, server)

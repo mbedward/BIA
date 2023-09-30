@@ -1,8 +1,8 @@
 Package: BIA
 Type: Package
 Title: Run queries on BIA data contained in an ESRI GeoDatabase
-Version: 0.1.1
-Date: 2023-09-28
+Version: 0.2.0
+Date: 2023-09-30
 Authors@R: c(
   person("Michael", "Bedward", role = "cre", email = "mbedward@uow.edu.au"),
   person("Owen", "Price", role = "ctb", email = "oprice@uow.edu.au")
