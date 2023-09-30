@@ -10,7 +10,8 @@ browse_bia(
   feature_layer = "BIAver2",
   feature_key = "GlobalID",
   attachment_layer = "BIAver2__ATTACH",
-  attachment_key = "REL_GLOBALID"
+  attachment_key = "REL_GLOBALID",
+  debug_info = FALSE
 )
 }
 \arguments{
@@ -31,6 +32,10 @@ attachments. Default value is \code{'BIAver2__ATTACH'}.}
 
 \item{attachment_key}{(character) Name of the attachment layer key field
 linking records to features. Default value is \code{'rel_globalid'}.}
+
+\item{debug_info}{(logical) If \code{TRUE}, print SQL query commands and
+other internal information for debugging purposes. Default is \code{FALSE}
+for no debug information.}
 
 \item{BIA_path}{(character) Path to the ESRI geodatabase of BIA features and
 associated attachments.}

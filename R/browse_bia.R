@@ -25,6 +25,10 @@
 #' @param attachment_key (character) Name of the attachment layer key field
 #'   linking records to features. Default value is \code{'rel_globalid'}.
 #'
+#' @param debug_info (logical) If \code{TRUE}, print SQL query commands and
+#'   other internal information for debugging purposes. Default is \code{FALSE}
+#'   for no debug information.
+#'
 #' @export
 #'
 browse_bia <- function(BIA_PATH,
@@ -32,13 +36,15 @@ browse_bia <- function(BIA_PATH,
                        feature_layer = "BIAver2",
                        feature_key = "GlobalID",
                        attachment_layer = "BIAver2__ATTACH",
-                       attachment_key = "REL_GLOBALID") {
+                       attachment_key = "REL_GLOBALID",
+                       debug_info = FALSE) {
 
   if (!("shiny" %in% installed.packages()[, "Package"])) {
     stop("You need to install the 'shiny' package to use this function")
   }
 
   library(shiny)
+  library(shinyjs)
   library(leaflet)
 
 
@@ -73,26 +79,50 @@ browse_bia <- function(BIA_PATH,
     dat_bia <- dat_bia[ii, ]
   }
 
-  ui <- fixedPage(
+
+  ###################################################################
+  # UI
+  ###################################################################
+
+  ui <- fluidPage(
+    useShinyjs(),
+
     titlePanel("Building Impact Assessment"),
 
-    fixedRow(
-      column(width = 6,
+    sidebarLayout(
+      sidebarPanel(
+        width = 5,
         leafletOutput("map", height = 800),
       ),
-      column(width = 6,
+
+      mainPanel(
+        width = 7,
+        div(style="display: inline-block;vertical-align:top;",
+          actionButton("btn_first_photo", label = NULL, icon = icon("angles-left", lib = "font-awesome")),
+          actionButton("btn_prev_photo", label = NULL, icon = icon("angle-left", lib = "font-awesome")),
+          actionButton("btn_next_photo", label = NULL, icon = icon("angle-right", lib = "font-awesome")),
+          actionButton("btn_last_photo", label = NULL, icon = icon("angles-right", lib = "font-awesome")),
+
+          div(style="display: inline-block;vertical-align:top; width: 20px;", HTML("<br>")),
+
+          downloadButton("save_photo", label = NULL, icon = icon("floppy-disk", lib = "font-awesome"))
+        ),
+
         textOutput("info"),
-        selectInput("photo_num", "Photo", choices = NULL),
         imageOutput("photo", width = "auto", height = "auto")
       )
     )
   )
 
 
+  ###################################################################
+  # Server
+  ###################################################################
+
   # Paths to JPG files for photos associated with a currently
   # selected BIA feature
   photo_paths <- reactiveVal(character(0))
-
+  cur_photo <- reactiveVal(integer(0))
 
   server <- function(input, output, session) {
     # Function to set marker colours based on ImpactAssessment value
@@ -110,14 +140,22 @@ browse_bia <- function(BIA_PATH,
     })
 
     observeEvent(photo_paths(), {
-      if (length(photo_paths()) == 0) {
-        choices <- character(0)
-        selected <- character(0)
-      } else {
-        choices <- as.character(1:length(photo_paths()))
-        selected <- "1"
+      n <- length(photo_paths())
+      if (n == 0) {
+        status_text <- "No photos"
+        cur_photo(integer(0))
+        shinyjs::disable("save_photo")
+
+      } else if (n == 1) {
+        status_text <- "1 photo"
+        cur_photo(1)
+        shinyjs::enable("save_photo")
+
+      } else if (n > 1) {
+        status_text <- paste(n, "photos")
+        cur_photo(1)
+        shinyjs::enable("save_photo")
       }
-      updateSelectInput(session, "photo_num", choices = choices, selected = selected)
     })
 
     output$map <- renderLeaflet({
@@ -144,7 +182,7 @@ browse_bia <- function(BIA_PATH,
     })
 
     output$photo <- renderImage({
-      i <- as.integer(input$photo_num)
+      i <- cur_photo()
       req(length(i) > 0)
 
       path <- photo_paths()[i]
@@ -153,6 +191,43 @@ browse_bia <- function(BIA_PATH,
       deleteFile = FALSE
     )
 
+
+    ##### Photo select buttons
+
+    observeEvent(input$btn_first_photo, {
+      req(length(cur_photo()) > 0)
+      cur_photo(1)
+    })
+
+    observeEvent(input$btn_prev_photo, {
+      req(length(cur_photo()) > 0)
+      i <- cur_photo()
+      if (i > 1) cur_photo(i - 1)
+    })
+
+    observeEvent(input$btn_next_photo, {
+      req(length(cur_photo()) > 0)
+      i <- cur_photo()
+      if (i < length(photo_paths())) cur_photo(i + 1)
+    })
+
+    observeEvent(input$btn_last_photo, {
+      req(length(cur_photo()) > 0)
+      cur_photo(length(photo_paths()))
+    })
+
+    ##### Save photo to file
+    output$save_photo <- downloadHandler(
+      filename = function() {
+        i <- cur_photo()
+        fs::path_file( photo_paths()[i] )
+      },
+      content = function(dest) {
+        i <- cur_photo()
+        invisible(file.copy(photo_paths()[i], dest))
+      },
+      contentType = "image/jpeg"
+    )
 
     observe({
       ev <- input$map_marker_click
@@ -166,7 +241,7 @@ browse_bia <- function(BIA_PATH,
       cmd <- glue::glue("select {attachment_key} as fkey, GLOBALID as photokey, DATA from {attachment_layer}
                         where {attachment_key} = '{ev$id}'")
 
-      print(cmd)
+      if (debug_info) print(cmd)
 
       # Suppress warning about no geometry in the table
       suppressWarnings(
@@ -174,10 +249,12 @@ browse_bia <- function(BIA_PATH,
       )
 
       nphotos <- nrow(res)
-      print(paste(nphotos, "photos found"))
+
+      if (debug_info) print(paste(nphotos, "photos found"))
 
       if (nphotos == 0) {
         photo_paths(character(0))
+        cur_photo(integer(0))
 
       } else {
         photo_dir <- tempdir(check = TRUE)
@@ -191,12 +268,14 @@ browse_bia <- function(BIA_PATH,
         })
 
         photo_paths(paths)
+        cur_photo(1)
       }
     })
 
     onStop(
       function() {
-        print("Removing cached photos")
+        if (debug_info) print("Removing cached photos")
+
         invisible( file.remove(dir(tempdir(), pattern = "\\.jpg$", full.names = TRUE)) )
       }
     )
