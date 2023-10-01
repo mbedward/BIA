@@ -48,9 +48,11 @@ browse_bia <- function(BIA_PATH,
     stop("You need to install the 'shiny' package to use this function")
   }
 
-  library(shiny)
-  library(shinyjs, warn.conflicts = FALSE)
-  library(leaflet)
+  suppressPackageStartupMessages({
+    library(shiny)
+    library(shinyjs, warn.conflicts = FALSE)
+    library(leaflet)
+  })
 
 
   # Check BIA data is accessible and feature and attachment layers are present
