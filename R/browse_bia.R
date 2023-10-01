@@ -72,17 +72,15 @@ browse_bia <- function(BIA_PATH,
   }
 
   # Filtering on ImpactAssessment values
-  if (length(impact_values) == 0) impact_values <- NULL
-  ok <- checkmate::test_integerish(impact_values, lower = 1, any.missing = FALSE, null.ok = TRUE)
-  if (!ok) stop("impact_values argument should be a vector of integer values >= 1")
+  if (length(impact_values) == 0) impact_values <- 1:12
+  ok <- checkmate::test_integerish(impact_values, lower = 1, upper = 12, any.missing = FALSE, null.ok = TRUE)
+  if (!ok) stop("impact_values argument should be a vector of integer values between 1 and 12")
 
   message("Reading BIA features")
   dat_bia <- sf::st_read(BIA_PATH, layer = feature_layer, quiet = TRUE)
 
-  if (!is.null(impact_values)) {
-    ii <- which(dat_bia$ImpactAssessment %in% impact_values)
-    dat_bia <- dat_bia[ii, ]
-  }
+  ii <- which(dat_bia$ImpactAssessment %in% impact_values)
+  dat_bia <- dat_bia[ii, ]
 
 
   ###################################################################
@@ -103,14 +101,14 @@ browse_bia <- function(BIA_PATH,
       mainPanel(
         width = 7,
         div(style="display: inline-block;vertical-align:top;",
-          actionButton("btn_first_photo", label = NULL, icon = icon("angles-left", lib = "font-awesome")),
-          actionButton("btn_prev_photo", label = NULL, icon = icon("angle-left", lib = "font-awesome")),
-          actionButton("btn_next_photo", label = NULL, icon = icon("angle-right", lib = "font-awesome")),
-          actionButton("btn_last_photo", label = NULL, icon = icon("angles-right", lib = "font-awesome")),
+            actionButton("btn_first_photo", label = NULL, icon = icon("angles-left", lib = "font-awesome")),
+            actionButton("btn_prev_photo", label = NULL, icon = icon("angle-left", lib = "font-awesome")),
+            actionButton("btn_next_photo", label = NULL, icon = icon("angle-right", lib = "font-awesome")),
+            actionButton("btn_last_photo", label = NULL, icon = icon("angles-right", lib = "font-awesome")),
 
-          div(style="display: inline-block;vertical-align:top; width: 20px;", HTML("<br>")),
+            div(style="display: inline-block;vertical-align:top; width: 20px;", HTML("<br>")),
 
-          downloadButton("save_photo", label = NULL, icon = icon("floppy-disk", lib = "font-awesome"))
+            downloadButton("save_photo", label = NULL, icon = icon("floppy-disk", lib = "font-awesome"))
         ),
 
         textOutput("info"),
@@ -130,8 +128,39 @@ browse_bia <- function(BIA_PATH,
   cur_photo <- reactiveVal(integer(0))
 
   server <- function(input, output, session) {
+
+    ##### Display map of BIA features
+
     # Function to set marker colours based on ImpactAssessment value
-    impact_colour <- leaflet::colorFactor(topo.colors(12), 1:12)
+    impact_colour <- leaflet::colorFactor(palette.colors(12, palette = "Alphabet"), 1:12)
+
+    output$map <- renderLeaflet({
+      leaflet(data = dat_bia) %>%
+        addProviderTiles(providers$OpenStreetMap, group = "Open Street Map") %>%
+        addProviderTiles(providers$OpenTopoMap, group = "Open Topo Map") %>%
+        addProviderTiles(providers$Esri.WorldImagery, group = "ESRI Imagery") %>%
+
+        addLegend(position = "bottomright",
+                  pal = impact_colour,
+                  values = impact_values,
+                  title = "Impact value") %>%
+
+        addCircleMarkers(
+          radius = 6,
+          fillOpacity = 0.7,
+          stroke = FALSE,
+          color = ~impact_colour(ImpactAssessment),
+          label = ~GlobalID,
+          clusterOptions = markerClusterOptions(spiderfyDistanceMultiplier=2, maxClusterRadius = 30),
+          group = "BIA features",
+          layerId = ~GlobalID  # unique id for each feature
+        ) %>%
+
+       addLayersControl(
+         baseGroups = c("Open Street Map", "Open Topo Map", "ESRI Imagery"),
+         overlayGroups = c("BIA features")
+       )
+    })
 
     output$info <- renderText({
       n <- length(photo_paths())
@@ -163,37 +192,14 @@ browse_bia <- function(BIA_PATH,
       }
     })
 
-    output$map <- renderLeaflet({
-      leaflet(data = dat_bia) %>%
-        addProviderTiles("Stamen.Toner", group = "Toner by Stamen") %>%
-        addProviderTiles("OpenTopoMap", group = "Open Topo Map") %>%
-        addProviderTiles("OpenStreetMap", group = "Open Street Map") %>%
-
-        addCircleMarkers(
-          radius = 10,
-          fillOpacity = 0.7,
-          stroke = FALSE,
-          color = ~impact_colour(ImpactAssessment),
-          label = ~GlobalID,
-          clusterOptions = markerClusterOptions(spiderfyDistanceMultiplier=2, maxClusterRadius = 30),
-          group = "Markers",
-          layerId = ~GlobalID  # unique id for each feature
-          ) %>%
-
-        addLayersControl(
-          baseGroups = c("OpenStreetMap", "OpenTopoMap", "Toner by Stamen"),
-          overlayGroups = c("Markers")
-        )
-    })
-
     output$photo <- renderImage({
       i <- cur_photo()
       req(length(i) > 0)
 
       path <- photo_paths()[i]
       list(src = path, width = 600)
-      },
-      deleteFile = FALSE
+    },
+    deleteFile = FALSE
     )
 
 
@@ -243,37 +249,25 @@ browse_bia <- function(BIA_PATH,
 
       req(!(is.null(ev) || is.null(ev$id)))
 
-      cmd <- glue::glue("select {attachment_key} as fkey, GLOBALID as photokey, DATA from {attachment_layer}
-                        where {attachment_key} = '{ev$id}'")
+      photo_dir <- tempdir(check = TRUE)
+      res <- cache_photos_for_feature(ev$id, BIA_PATH,
+                                      cache_dir = photo_dir,
+                                      attachment_layer_name = attachment_layer,
+                                      attachment_key_name = attachment_key)
 
-      if (debug_info) print(cmd)
+      nphotos <- length(res$paths)
 
-      # Suppress warning about no geometry in the table
-      suppressWarnings(
-        res <- sf::st_read(dsn = BIA_PATH, query = cmd, as_tibble = TRUE, quiet = TRUE)
-      )
+      if (debug_info) {
+        print(paste("Query:", res$cmd))
+        print(paste(nphotos, "photos found"))
+      }
 
-      nphotos <- nrow(res)
-
-      if (debug_info) print(paste(nphotos, "photos found"))
-
-      if (nphotos == 0) {
+      if (nphotos > 0) {
+        photo_paths(res$paths)
+        cur_photo(1)
+      } else {
         photo_paths(character(0))
         cur_photo(integer(0))
-
-      } else {
-        photo_dir <- tempdir(check = TRUE)
-
-        paths <- sapply(seq_len(nphotos), function(k) {
-          fname <- gsub("\\{|\\}", "", res$fkey[k])
-          fname <- sprintf("%s_%03d.jpg", fname, k)
-          outpath <- file.path(photo_dir, fname)
-          writeBin(res$DATA[k][[1]], con = outpath)
-          outpath
-        })
-
-        photo_paths(paths)
-        cur_photo(1)
       }
     })
 
@@ -288,3 +282,41 @@ browse_bia <- function(BIA_PATH,
 
   shinyApp(ui, server)
 }
+
+
+# Private function to retrieve photos for a BIA feature and cache them to disk.
+# Returns a list with elements:
+#   cmd - SQL command used to query the attachments table
+#   paths - character vector of paths to cached photos
+#
+cache_photos_for_feature <- function(fkey,
+                                     BIA_PATH,
+                                     cache_dir,
+                                     attachment_layer_name,
+                                     attachment_key_name) {
+
+  cmd <- glue::glue("select {attachment_key_name} as fkey, GLOBALID as photokey, DATA from {attachment_layer_name}
+                        where {attachment_key_name} = '{fkey}'")
+
+  # Suppress warning about no geometry in the table
+  suppressWarnings(
+    res <- sf::st_read(dsn = BIA_PATH, query = cmd, as_tibble = TRUE, quiet = TRUE)
+  )
+
+  nphotos <- nrow(res)
+
+  if (nphotos > 0) {
+    paths <- sapply(seq_len(nphotos), function(k) {
+      fname <- gsub("\\{|\\}", "", res$fkey[k])
+      fname <- sprintf("%s_%03d.jpg", fname, k)
+      outpath <- file.path(cache_dir, fname)
+      writeBin(res$DATA[k][[1]], con = outpath)
+      outpath
+    })
+  } else {
+    paths <- character(0)
+  }
+
+  list(cmd = cmd, paths = paths)
+}
+
