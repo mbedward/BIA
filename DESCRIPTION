@@ -1,8 +1,8 @@
 Package: BIA
 Type: Package
 Title: Run queries on BIA data contained in an ESRI GeoDatabase
-Version: 0.2.2
-Date: 2023-10-01
+Version: 0.2.3
+Date: 2023-10-11
 Authors@R: c(
   person("Michael", "Bedward", role = "cre", email = "mbedward@uow.edu.au"),
   person("Owen", "Price", role = "ctb", email = "oprice@uow.edu.au")
@@ -13,6 +13,7 @@ Description: Run queries on BIA (Building Impact Assessment) data compiled by
     feature.
 Depends: R (>= 4.3.0),
 Imports: checkmate,
+  DT,
   fs,
   glue,
   leaflet,

@@ -2,7 +2,7 @@
 % Please edit documentation in R/browse_bia.R
 \name{browse_bia}
 \alias{browse_bia}
-\title{App to display a map of BIA feature locations and associated photos}
+\title{Display an interactive map of BIA feature locations and associated photos}
 \usage{
 browse_bia(
   BIA_PATH,

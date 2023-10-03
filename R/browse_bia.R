@@ -1,4 +1,4 @@
-#' App to display a map of BIA feature locations and associated photos
+#' Display an interactive map of BIA feature locations and associated photos
 #'
 #' This function launches a Shiny app with a map of BIA feature locations.
 #' Clicking on a feature will query attachments table in the BIA database to
@@ -78,6 +78,15 @@ browse_bia <- function(BIA_PATH,
   ok <- checkmate::test_integerish(impact_values, lower = 1, upper = 12, any.missing = FALSE, null.ok = TRUE)
   if (!ok) stop("impact_values argument should be a vector of integer values between 1 and 12")
 
+  impact_labels <- bia_lookup %>%
+    dplyr::filter(attribute == "ImpactAssessment", value %in% impact_values) %>%
+    dplyr::pull(label)
+
+  if (debug_info) {
+    print(paste("Impact values:", paste(impact_values, collapse = ", ")))
+    print(paste("Impact labels:", paste(impact_labels, collapse = ", ")))
+  }
+
   message("Reading BIA features")
   dat_bia <- sf::st_read(BIA_PATH, layer = feature_layer, quiet = TRUE)
 
@@ -102,19 +111,27 @@ browse_bia <- function(BIA_PATH,
 
       mainPanel(
         width = 7,
-        div(style="display: inline-block;vertical-align:top;",
-            actionButton("btn_first_photo", label = NULL, icon = icon("angles-left", lib = "font-awesome")),
-            actionButton("btn_prev_photo", label = NULL, icon = icon("angle-left", lib = "font-awesome")),
-            actionButton("btn_next_photo", label = NULL, icon = icon("angle-right", lib = "font-awesome")),
-            actionButton("btn_last_photo", label = NULL, icon = icon("angles-right", lib = "font-awesome")),
+        tabsetPanel(type = "tabs",
+          tabPanel("Photos",
+            div(style="display: inline-block;vertical-align:top;",
+                actionButton("btn_first_photo", label = NULL, icon = icon("angles-left", lib = "font-awesome")),
+                actionButton("btn_prev_photo", label = NULL, icon = icon("angle-left", lib = "font-awesome")),
+                actionButton("btn_next_photo", label = NULL, icon = icon("angle-right", lib = "font-awesome")),
+                actionButton("btn_last_photo", label = NULL, icon = icon("angles-right", lib = "font-awesome")),
 
-            div(style="display: inline-block;vertical-align:top; width: 20px;", HTML("<br>")),
+                div(style="display: inline-block;vertical-align:top; width: 20px;", HTML("<br>")),
 
-            downloadButton("save_photo", label = NULL, icon = icon("floppy-disk", lib = "font-awesome"))
-        ),
+                downloadButton("save_photo", label = NULL, icon = icon("floppy-disk", lib = "font-awesome"))
+            ),
 
-        textOutput("info"),
-        imageOutput("photo", width = "auto", height = "auto")
+            textOutput("info"),
+            imageOutput("photo", width = "auto", height = "auto")
+          ),
+
+          tabPanel("Data",
+            DT::DTOutput("feature_data")
+          )
+        )
       )
     )
   )
@@ -124,12 +141,15 @@ browse_bia <- function(BIA_PATH,
   # Server
   ###################################################################
 
-  # Paths to JPG files for photos associated with a currently
-  # selected BIA feature
-  photo_paths <- reactiveVal(character(0))
-  cur_photo <- reactiveVal(integer(0))
-
   server <- function(input, output, session) {
+
+    # Data for feature the user has selected on the map
+    cur_feature_data <- reactiveVal(NULL)
+
+    # Paths to JPG files for photos associated with a currently
+    # selected BIA feature
+    photo_paths <- reactiveVal(character(0))
+    cur_photo <- reactiveVal(integer(0))
 
     ##### Display map of BIA features
 
@@ -142,10 +162,17 @@ browse_bia <- function(BIA_PATH,
         addProviderTiles(providers$OpenTopoMap, group = "Open Topo Map") %>%
         addProviderTiles(providers$Esri.WorldImagery, group = "ESRI Imagery") %>%
 
-        addLegend(position = "bottomright",
-                  pal = impact_colour,
-                  values = impact_values,
-                  title = "Impact value") %>%
+        addLegend(
+          title = "Impact",
+          position = "bottomright",
+          pal = impact_colour,
+          values = ~ImpactAssessment,
+          labFormat  = labelFormat(
+            transform = function(x) {
+              k <- which(impact_values == x)
+              impact_labels[k]
+            }),
+        ) %>%
 
         addCircleMarkers(
           radius = 6,
@@ -205,6 +232,14 @@ browse_bia <- function(BIA_PATH,
     )
 
 
+    output$feature_data <- DT::renderDT({
+      if (debug_info) print(cur_feature_data())
+
+      format_data_for_display(cur_feature_data())
+    },
+    options = list(scrollX = TRUE) )
+
+
     ##### Photo select buttons
 
     observeEvent(input$btn_first_photo, {
@@ -250,6 +285,15 @@ browse_bia <- function(BIA_PATH,
       }
 
       req(!(is.null(ev) || is.null(ev$id)))
+
+      # Get feature data
+      i <- which(dat_bia$GlobalID == ev$id)
+      if (length(i) == 1) {
+        x <- sf::st_drop_geometry(dat_bia)[i,]
+        # x <- apply(x, MARGIN = 1, FUN = as.character)
+        # x <- data.frame(field = colnames(x), value = unlist(x[1,]))
+        cur_feature_data(x)
+      }
 
       photo_dir <- tempdir(check = TRUE)
       res <- cache_photos_for_feature(ev$id, BIA_PATH,
@@ -322,3 +366,48 @@ cache_photos_for_feature <- function(fkey,
   list(cmd = cmd, paths = paths)
 }
 
+
+# Private function to format a BIA data record for display
+format_data_for_display <- function(dat_rec) {
+  dat_rec <- as.data.frame(dat_rec)
+
+  dat <- data.frame(attribute = colnames(dat_rec),
+                    value = "",
+                    label = "")
+
+  cl <- sapply(dat_rec, class)
+
+  values <- sapply(seq_len(ncol(dat_rec)), function(i) {
+    x <- dat_rec[1,i]
+    if (lubridate::is.Date(x)) {
+      format(x, "%Y-%m-%d")
+    } else if (lubridate::is.POSIXt(x)) {
+      format(x, "%Y-%m-%d %H:%M")
+    } else {
+      as.character(x)
+    }
+  })
+
+  dat$value <- values
+
+  # Look up attribute values
+  found <- which(tolower(dat$attribute) %in% tolower(bia_lookup$attribute))
+
+  labels <- sapply(seq_along(found), function(i) {
+    lab <- ""
+    if (found[i]) {
+      ii <- grep(dat$attribute[i], bia_lookup$attribute, ignore.case = TRUE)
+      if (length(ii) > 0) {
+        k <- match(as.integer(dat$value[i]), bia_lookup$value[ii])
+        if (!is.na(k)) {
+          lab <- bia_lookup$label[ii[k]]
+        }
+      }
+    }
+    lab
+  })
+
+  dat$label[found] <- labels
+
+  dat
+}

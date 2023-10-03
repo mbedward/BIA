@@ -1,0 +1,19 @@
+"...1","ImpactAssessment","BuildingType","Damage","Habitable","FacilityInfrastructureSubtype","StructureType","ExternalWallMaterial","RoofMaterial","NoFloorLevels","InfrastructureType","MainAreaStructuralDamage"
+1,"House untouched","Residential","No damage / unaffected","Habitable","Commercial","Fixed","Double Brick","Alsynite",NA,"Electricity generation, transmission and distribution.","Roof"
+2,"House damaged","Commercial","Slight damage","Not habitable","Industrial","Mobile","Brick veneer","Fibre sheeting",NA,"Gas production, transport and distribution","Walls"
+3,"House destroyed","Industrial","Moderate damage","Not stated / inadequately described","School","Not Stated/ Inadequately described","Light weight cladding","Metal sheeting",NA,NA,"Floor"
+4,"Facility untouched","Special Risk","Severe damage",NA,"Child care",NA,"Metal sheeting","Slate",NA,"Telecommunication",NA
+5,"Facility damaged","Community","Total damage / destroyed",NA,"Aged care",NA,"Reinforced Masonry","Tile",NA,"Water supply","Foundations"
+6,"Facility destroyed",NA,"Damage Not stated / inadequately described",NA,NA,NA,"Unreinforced Masonry","Concrete",NA,"Agriculture, food production and distribution","Unknown"
+7,"Outbuilding untouched",NA,NA,NA,"Tourist",NA,"Tilt Slab Concrete","Timber",NA,NA,NA
+8,"Outbuilding damaged",NA,NA,NA,"Public Building",NA,"Weatherboard","Other",NA,"Law enforcement, police station",NA
+9,"Outbuilding destroyed",NA,NA,NA,"Telecommunications",NA,"Glass light weight",NA,NA,NA,NA
+10,"Hazard",NA,NA,NA,"Electricity generation, transmission and distribution.",NA,"Composite",NA,NA,"Schools & Universities",NA
+11,"To be assessed",NA,NA,NA,"Other",NA,"Other",NA,NA,"Emergency Services, e.g. fire stations, SES, ambulance",NA
+12,"Point of interest",NA,NA,NA,"Not applicable",NA,NA,NA,NA,"Transportation systems (railway network, airports, harbours",NA
+13,NA,NA,NA,NA,NA,NA,NA,NA,NA,"Road surface",NA
+14,NA,NA,NA,NA,NA,NA,NA,NA,NA,NA,NA
+15,NA,NA,NA,NA,NA,NA,NA,NA,NA,"Bridge",NA
+16,NA,NA,NA,NA,NA,NA,NA,NA,NA,"Military",NA
+17,NA,NA,NA,NA,NA,NA,NA,NA,NA,"Other",NA
+18,NA,NA,NA,NA,NA,NA,NA,NA,NA,"Not applicable",NA
