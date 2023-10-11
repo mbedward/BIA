@@ -78,9 +78,10 @@ browse_bia <- function(BIA_PATH,
   ok <- checkmate::test_integerish(impact_values, lower = 1, upper = 12, any.missing = FALSE, null.ok = TRUE)
   if (!ok) stop("impact_values argument should be a vector of integer values between 1 and 12")
 
-  impact_labels <- bia_lookup %>%
-    dplyr::filter(attribute == "ImpactAssessment", value %in% impact_values) %>%
-    dplyr::pull(label)
+  impact_labels <- {
+    ii <- with(bia_lookup, attribute == "ImpactAssessment" & value %in% impact_values)
+    bia_lookup$label[ii]
+  }
 
   if (debug_info) {
     print(paste("Impact values:", paste(impact_values, collapse = ", ")))
