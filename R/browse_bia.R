@@ -369,6 +369,8 @@ cache_photos_for_feature <- function(fkey,
 
 # Private function to format a BIA data record for display
 format_data_for_display <- function(dat_rec) {
+  if (is.null(dat_rec)) return(NULL)
+
   dat_rec <- as.data.frame(dat_rec)
 
   dat <- data.frame(attribute = colnames(dat_rec),
