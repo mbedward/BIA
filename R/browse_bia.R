@@ -155,7 +155,13 @@ browse_bia <- function(BIA_PATH,
     ##### Display map of BIA features
 
     # Function to set marker colours based on ImpactAssessment value
-    impact_colour <- leaflet::colorFactor(palette.colors(12, palette = "Alphabet"), 1:12)
+    get_impact_colour <- leaflet::colorFactor(palette.colors(12, palette = "Alphabet"), 1:12)
+
+    # Function to map integer impact values to impact labels
+    get_impact_label <- function(x) {
+      k <- which(impact_values == x)
+      impact_labels[k]
+    }
 
     output$map <- renderLeaflet({
       leaflet(data = dat_bia) %>%
@@ -166,22 +172,23 @@ browse_bia <- function(BIA_PATH,
         addLegend(
           title = "Impact",
           position = "bottomright",
-          pal = impact_colour,
+          pal = get_impact_colour,
           values = ~ImpactAssessment,
           labFormat  = labelFormat(
-            transform = function(x) {
-              k <- which(impact_values == x)
-              impact_labels[k]
-            }),
+            transform = get_impact_label),
         ) %>%
 
         addCircleMarkers(
           radius = 6,
           fillOpacity = 0.7,
           stroke = FALSE,
-          color = ~impact_colour(ImpactAssessment),
+          color = ~get_impact_colour(ImpactAssessment),
           label = ~GlobalID,
-          clusterOptions = markerClusterOptions(spiderfyDistanceMultiplier=2, maxClusterRadius = 30),
+
+          clusterOptions = markerClusterOptions(
+            spiderfyDistanceMultiplier=2,
+            maxClusterRadius = 30),
+
           group = "BIA features",
           layerId = ~GlobalID  # unique id for each feature
         ) %>%
