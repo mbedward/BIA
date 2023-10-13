@@ -159,8 +159,23 @@ browse_bia <- function(BIA_PATH,
 
     # Function to map integer impact values to impact labels
     get_impact_label <- function(x) {
-      k <- which(impact_values == x)
-      impact_labels[k]
+      k <- match(x, impact_values)
+      ifelse(is.na(k), "Unknown", impact_labels[k])
+    }
+
+    done <- FALSE
+
+    format_feature_label <- function(id) {
+      if (!done) {
+        print("called format_feature_label")
+        done <<- TRUE
+      }
+
+      ii <- match(id, dat_bia$GlobalID)
+      x <- dat_bia$ImpactAssessment[ii]
+      il <- get_impact_label(x)
+      il <- paste(id, il, sep="<br>")
+      lapply(il, htmltools::HTML)
     }
 
     output$map <- renderLeaflet({
@@ -183,7 +198,8 @@ browse_bia <- function(BIA_PATH,
           fillOpacity = 0.7,
           stroke = FALSE,
           color = ~get_impact_colour(ImpactAssessment),
-          label = ~GlobalID,
+
+          label = ~format_feature_label(GlobalID),
 
           clusterOptions = markerClusterOptions(
             spiderfyDistanceMultiplier=2,
