@@ -144,8 +144,8 @@ browse_bia <- function(BIA_PATH,
 
   server <- function(input, output, session) {
 
-    # Data for feature the user has selected on the map
-    cur_feature_data <- reactiveVal(NULL)
+    # Data for feature the user has selected on the map (initially no data)
+    cur_feature_data <- reactiveVal(dat_bia[integer(0), ])
 
     # Paths to JPG files for photos associated with a currently
     # selected BIA feature
@@ -163,14 +163,7 @@ browse_bia <- function(BIA_PATH,
       ifelse(is.na(k), "Unknown", impact_labels[k])
     }
 
-    done <- FALSE
-
     format_feature_label <- function(id) {
-      if (!done) {
-        print("called format_feature_label")
-        done <<- TRUE
-      }
-
       ii <- match(id, dat_bia$GlobalID)
       x <- dat_bia$ImpactAssessment[ii]
       il <- get_impact_label(x)
@@ -301,6 +294,7 @@ browse_bia <- function(BIA_PATH,
       contentType = "image/jpeg"
     )
 
+    # Feature selected via mouse click
     observe({
       ev <- input$map_marker_click
 
@@ -313,9 +307,8 @@ browse_bia <- function(BIA_PATH,
       # Get feature data
       i <- which(dat_bia$GlobalID == ev$id)
       if (length(i) == 1) {
-        x <- sf::st_drop_geometry(dat_bia)[i,]
-        # x <- apply(x, MARGIN = 1, FUN = as.character)
-        # x <- data.frame(field = colnames(x), value = unlist(x[1,]))
+        #x <- sf::st_drop_geometry(dat_bia)[i,]
+        x <- dat_bia[i,]
         cur_feature_data(x)
       }
 
@@ -339,8 +332,22 @@ browse_bia <- function(BIA_PATH,
         photo_paths(character(0))
         cur_photo(integer(0))
       }
+
+      # Highlight the currently selected feature
+      lprox <- leaflet::leafletProxy("map")
+
+      lprox %>%
+        clearGroup("selected_feature") %>%
+        addCircleMarkers(data = cur_feature_data(),
+                         color = "yellow",
+                         opacity = 0.9,
+                         fill = FALSE,
+                         radius = 10,
+                         group = "selected_feature")
     })
 
+
+    # Clean-up the cache directory when we're finished
     onStop(
       function() {
         if (debug_info) print("Removing cached photos")
@@ -392,14 +399,14 @@ cache_photos_for_feature <- function(fkey,
 
 
 # Private function to format a BIA data record for display
-format_data_for_display <- function(dat_rec) {
-  if (is.null(dat_rec)) return(NULL)
+format_data_for_display <- function(xsf_rec) {
+  if (is.null(xsf_rec)) return(NULL)
 
-  dat_rec <- as.data.frame(dat_rec)
+  dat_rec <- as.data.frame(sf::st_drop_geometry(xsf_rec))
 
-  dat <- data.frame(attribute = colnames(dat_rec),
-                    value = "",
-                    label = "")
+  dat_formatted <- data.frame(attribute = colnames(dat_rec),
+                              value = "",
+                              label = "")
 
   cl <- sapply(dat_rec, class)
 
@@ -414,17 +421,17 @@ format_data_for_display <- function(dat_rec) {
     }
   })
 
-  dat$value <- values
+  dat_formatted$value <- values
 
   # Look up attribute values
-  found <- which(tolower(dat$attribute) %in% tolower(bia_lookup$attribute))
+  found <- which(tolower(dat_formatted$attribute) %in% tolower(bia_lookup$attribute))
 
   labels <- sapply(seq_along(found), function(i) {
     lab <- ""
     if (found[i]) {
-      ii <- grep(dat$attribute[i], bia_lookup$attribute, ignore.case = TRUE)
+      ii <- grep(dat_formatted$attribute[i], bia_lookup$attribute, ignore.case = TRUE)
       if (length(ii) > 0) {
-        k <- match(as.integer(dat$value[i]), bia_lookup$value[ii])
+        k <- match(as.integer(dat_formatted$value[i]), bia_lookup$value[ii])
         if (!is.na(k)) {
           lab <- bia_lookup$label[ii[k]]
         }
@@ -433,7 +440,7 @@ format_data_for_display <- function(dat_rec) {
     lab
   })
 
-  dat$label[found] <- labels
+  dat_formatted$label[found] <- labels
 
-  dat
+  dat_formatted
 }
