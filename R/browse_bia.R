@@ -336,14 +336,17 @@ browse_bia <- function(BIA_PATH,
       # Highlight the currently selected feature
       lprox <- leaflet::leafletProxy("map")
 
-      lprox %>%
-        clearGroup("selected_feature") %>%
-        addCircleMarkers(data = cur_feature_data(),
-                         color = "yellow",
-                         opacity = 0.9,
-                         fill = FALSE,
-                         radius = 10,
-                         group = "selected_feature")
+      # Note: suppress any warnings about bodgy map projection of BIA data
+      suppressWarnings({
+        lprox %>%
+          clearGroup("selected_feature") %>%
+          addCircleMarkers(data = cur_feature_data(),
+                           color = "yellow",
+                           opacity = 0.9,
+                           fill = FALSE,
+                           radius = 10,
+                           group = "selected_feature")
+      })
     })
 
 
